@@ -36,14 +36,12 @@ int readFile(const char *input_file_name,const char *extension) {
     fseek(input, 0, SEEK_END);
     const long fileSize = ftell(input);
     fseek(input, 0, SEEK_SET);
-
     // edge case empty file
     if (fileSize <= 0) {
         printf("File is empty or invalid.\nFile path: %s\n",input_file_name);
         fclose(input);
         return statusReportForUser(ERROR_FILE_EMPTY,input_file_name,extension);
     }
-
     // dynamic memory allocation
     char *fileText = malloc(fileSize + 1);
     if (fileText == NULL) {
@@ -78,41 +76,36 @@ int readFile(const char *input_file_name,const char *extension) {
         printf("Error: Processing failed (Logic returned NULL).\n");
         return statusReportForUser(ERROR_LOGIC_FAILED,input_file_name,extension);
     }
-    // finding the extension dot in the input name using string reverse char function
+    // determine the target output name
+    char finalOutputPath[FILENAME_BUFFER_SIZE];
     char baseName[FILENAME_BUFFER_SIZE];
+    // finding the extension dot in the input name using string reverse char function
     strcpy(baseName, input_file_name);
     char *dot = strrchr(baseName, '.');
-    if (dot != NULL) {
-        // chopping the string -> test.txt\0 -> test\0.txt or test
-        *dot = '\0';
-    }
-
-    // determining the new extension
+    // chopping the string -> test.txt\0 -> test\0.txt or test
+    if (dot != NULL) *dot = '\0';
+    // assigning extension
     const char *newExt = (strcmp(extension, FILE_EXTENSION_COMPRESS) == 0) ?
                           FILE_EXTENSION_DECOMPRESS : FILE_EXTENSION_COMPRESS;
-
-    // variables for while loop
-    int version = 1;
-    char versionedName[FILENAME_BUFFER_SIZE];
-    FILE *check = NULL;
-
-    while (1) {
-        // baseName + _version + newExt (e.g., test_1.rle)
-        snprintf(versionedName, sizeof(versionedName), "%s_%d%s",
-            baseName, version, newExt);
-
-        // check if this version already exists
-        check = fopen(versionedName, "r");
-        if (check == NULL) {
-            // name is available meaning we end the while loop and proceed
-            break;
-        }
-        // file exists, we close it, update the version counter and continue
+    // checking unversioned name first
+    snprintf(finalOutputPath, sizeof(finalOutputPath), "%s%s", baseName, newExt);
+    FILE *check = fopen(finalOutputPath, "r");
+    if (check != NULL) {
+        // it exists so we find a versioned name (test_1.rle, test_2.rle...)
         fclose(check);
-        version++; // Try the next number
+        int version = 1;
+        while (1) {
+            snprintf(finalOutputPath, sizeof(finalOutputPath), "%s_%d%s",
+                baseName, version, newExt);
+            check = fopen(finalOutputPath, "r");
+            // break if name is available
+            if (check == NULL) break;
+            fclose(check);
+            version++;
+        }
     }
     // getting a file handle to write
-    FILE *output = fopen(versionedName, "w");
+    FILE *output = fopen(finalOutputPath, "w");
     // if file handle is valid
     if (output != NULL) {
         // data is a null-terminated string, so we can use fputs or fwrite
@@ -120,15 +113,15 @@ int readFile(const char *input_file_name,const char *extension) {
         // saving the file
         fclose(output);
         // printing to the screen that file was saved
-        printf("File saved as: %s\n", versionedName);
+        printf("File saved as: %s\n", finalOutputPath);
         // freeing memory
         free(data);
         return statusReportForUser(SUCCESS,input_file_name,extension);
     }
-    perror("Error: Could not open output file for writing");
+    perror("Error: Could not open file for writing");
     // freeing memory
     free(data);
-    return statusReportForUser(ERROR_FILE_NOT_FOUND,input_file_name,extension);
+    return statusReportForUser(ERROR_WRITE_FAILED,input_file_name,extension);
 }
 
 char *compressLogic(const char *fileText,const long fileSize) {
