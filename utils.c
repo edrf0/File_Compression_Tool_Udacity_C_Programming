@@ -11,7 +11,8 @@ void readFile(const char *input_file_name,const char *extension) {
     FILE *input = fopen(input_file_name, "r");
     // checking if file handle is valid
     if (input == NULL) {
-        printf("Error opening file\n");
+        perror("Failed to open file");
+        printf("File path: %s\n",input_file_name);
         return;
     }
     // get file size
@@ -19,9 +20,9 @@ void readFile(const char *input_file_name,const char *extension) {
     const long fileSize = ftell(input);
     fseek(input, 0, SEEK_SET);
 
-    // edge case
-    if (fileSize == 0) {
-        printf("File is empty\n");
+    // edge case empty file
+    if (fileSize <= 0) {
+        printf("File is empty or invalid.\nFile path: %s\n",input_file_name);
         fclose(input);
         return;
     }
@@ -30,32 +31,71 @@ void readFile(const char *input_file_name,const char *extension) {
     char *fileText = malloc(fileSize + 1);
     if (fileText == NULL) {
         perror("Failed to allocate memory");
+        printf("File path: %s\n",input_file_name);
         fclose(input);
         return;
     }
     // file reading
-    fread(fileText, 1, fileSize, input);
-    fileText[fileSize] = '\0'; // null terminate
-
+    const size_t bytesRead = fread(fileText, 1, fileSize, input);
+    // closing file handle
+    fclose(input);
+    // checking if we effectively read all bytes
+    if (bytesRead < (size_t) fileSize) {
+        printf( "Error: Could not read entire file.\n");
+        free(fileText);
+        return;
+    }
+    // terminating the file buffer with null character
+    fileText[bytesRead] = '\0';
     // discriminating type of file and respective action
-    char *data;
+    char *data = NULL;
     if (strcmp(extension, FILE_EXTENSION_COMPRESS) == 0) {
         data = compressLogic(fileText,fileSize);
     } else {
         data = decompressLogic(fileText,fileSize);
     }
-    // closing the file handle
-    fclose(input);
-    // establishing the filename
-    char fileName[FILENAME_BUFFER_SIZE];
-    strcpy(fileName, FILE_OUTPUT_NAME_NO_EXT);
-    if (strcmp(extension, FILE_EXTENSION_COMPRESS) == 0) {
-        strcat(fileName, FILE_EXTENSION_DECOMPRESS);
-    } else {
-        strcat(fileName, FILE_EXTENSION_COMPRESS);
+    // freeing file buffer
+    free(fileText);
+    // checking if data is null
+    if (data == NULL) {
+        printf("Error: Processing failed (Logic returned NULL).\n");
+        return;
+    }
+    // finding the extension dot in the input name using string reverse char function
+    char baseName[FILENAME_BUFFER_SIZE];
+    strcpy(baseName, input_file_name);
+    char *dot = strrchr(baseName, '.');
+    if (dot != NULL) {
+        // chopping the string -> test.txt\0 -> test\0.txt or test
+        *dot = '\0';
+    }
+
+    // determining the new extension
+    const char *newExt = (strcmp(extension, FILE_EXTENSION_COMPRESS) == 0) ?
+                          FILE_EXTENSION_DECOMPRESS : FILE_EXTENSION_COMPRESS;
+
+    // variables for while loop
+    int version = 1;
+    char versionedName[FILENAME_BUFFER_SIZE];
+    FILE *check = NULL;
+
+    while (1) {
+        // baseName + _version + newExt (e.g., test_1.rle)
+        snprintf(versionedName, sizeof(versionedName), "%s_%d%s",
+            baseName, version, newExt);
+
+        // check if this version already exists
+        check = fopen(versionedName, "r");
+        if (check == NULL) {
+            // name is available meaning we end the while loop and proceed
+            break;
+        }
+        // file exists, we close it, update the version counter and continue
+        fclose(check);
+        version++; // Try the next number
     }
     // getting a file handle to write
-    FILE *output = fopen(fileName, "w");
+    FILE *output = fopen(versionedName, "w");
     // if file handle is valid
     if (output != NULL) {
         // data is a null-terminated string, so we can use fputs or fwrite
@@ -63,10 +103,11 @@ void readFile(const char *input_file_name,const char *extension) {
         // saving the file
         fclose(output);
         // printing to the screen that file was saved
-        printf("File saved as: %s\n", fileName);
+        printf("File saved as: %s\n", versionedName);
+    } else {
+        perror("Error: Could not open output file for writing");
     }
     // freeing memory
-    free(fileText);
     free(data);
 }
 
@@ -87,14 +128,8 @@ char *compressLogic(const char *fileText,const long fileSize) {
     for (int i=1; i<fileSize; ++i) {
         //checking if the current character is distinct to the one saved
         if (currentChar != fileText[i]) {
-            // we only concatenate if the current character is not a whitespace
-            if (currentChar != ' ' && currentChar != '\n' && currentChar != '\t') {
-                // concatenating current character and count plus updating tracking index
-                cdIndex += sprintf(compressedData + cdIndex, "%c%d", currentChar, count);
-            } else {
-                // concatenating only the whitespace character without its count
-                cdIndex += sprintf(compressedData + cdIndex, "%c", currentChar);
-            }
+            // concatenating current character and count plus updating tracking index
+            cdIndex += sprintf(compressedData + cdIndex, "%c%d", currentChar, count);
             // updating current character
             currentChar = fileText[i];
             // resetting count
@@ -117,7 +152,7 @@ char *decompressLogic(const char *fileText, const long fileSize) {
     char *decompressedData = malloc(outCapacity + 1);
     // checking if allocation failed
     if (decompressedData == NULL) {
-        perror("Failed to allocate memory");
+        perror("Failed to allocate decompressed data buffer");
         return NULL;
     }
     // establishing variables
