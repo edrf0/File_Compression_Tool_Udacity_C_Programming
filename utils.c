@@ -6,6 +6,23 @@
 #include <stdlib.h>
 #include <string.h>
 
+int statusReportForUser(const ErrorCode error_code,const char *input_file_name,const char* extension) {
+    if (error_code != SUCCESS) {
+        if (strcmp(extension, FILE_EXTENSION_COMPRESS) == 0) {
+            printf("Compression of %s failed.\n",input_file_name);
+        } else {
+            printf("Decompression of %s failed.\n",input_file_name);
+        }
+    } else {
+        if (strcmp(extension, FILE_EXTENSION_COMPRESS) == 0) {
+            printf("Successfully compressed %s.\n",input_file_name);
+        } else {
+            printf("Successfully decompressed %s.\n",input_file_name);
+        }
+    }
+    return error_code;
+}
+
 int readFile(const char *input_file_name,const char *extension) {
     // getting file handle
     FILE *input = fopen(input_file_name, "r");
@@ -13,7 +30,7 @@ int readFile(const char *input_file_name,const char *extension) {
     if (input == NULL) {
         perror("Failed to open file");
         printf("File path: %s\n",input_file_name);
-        return ERROR_FILE_NOT_FOUND;
+        return statusReportForUser(ERROR_FILE_NOT_FOUND,input_file_name,extension);
     }
     // get file size
     fseek(input, 0, SEEK_END);
@@ -24,7 +41,7 @@ int readFile(const char *input_file_name,const char *extension) {
     if (fileSize <= 0) {
         printf("File is empty or invalid.\nFile path: %s\n",input_file_name);
         fclose(input);
-        return ERROR_FILE_EMPTY;
+        return statusReportForUser(ERROR_FILE_EMPTY,input_file_name,extension);
     }
 
     // dynamic memory allocation
@@ -33,7 +50,7 @@ int readFile(const char *input_file_name,const char *extension) {
         perror("Failed to allocate memory");
         printf("File path: %s\n",input_file_name);
         fclose(input);
-        return ERROR_MEMORY_ALLOCATION;
+        return statusReportForUser(ERROR_MEMORY_ALLOCATION,input_file_name,extension);
     }
     // file reading
     const size_t bytesRead = fread(fileText, 1, fileSize, input);
@@ -43,7 +60,7 @@ int readFile(const char *input_file_name,const char *extension) {
     if (bytesRead < (size_t) fileSize) {
         printf( "Error: Could not read entire file.\n");
         free(fileText);
-        return ERROR_READ_FAILED;
+        return statusReportForUser(ERROR_READ_FAILED,input_file_name,extension);
     }
     // terminating the file buffer with null character
     fileText[bytesRead] = '\0';
@@ -59,7 +76,7 @@ int readFile(const char *input_file_name,const char *extension) {
     // checking if data is null
     if (data == NULL) {
         printf("Error: Processing failed (Logic returned NULL).\n");
-        return ERROR_LOGIC_FAILED;
+        return statusReportForUser(ERROR_LOGIC_FAILED,input_file_name,extension);
     }
     // finding the extension dot in the input name using string reverse char function
     char baseName[FILENAME_BUFFER_SIZE];
@@ -106,12 +123,12 @@ int readFile(const char *input_file_name,const char *extension) {
         printf("File saved as: %s\n", versionedName);
         // freeing memory
         free(data);
-        return SUCCESS;
+        return statusReportForUser(SUCCESS,input_file_name,extension);
     }
     perror("Error: Could not open output file for writing");
     // freeing memory
     free(data);
-    return ERROR_FILE_NOT_FOUND;
+    return statusReportForUser(ERROR_FILE_NOT_FOUND,input_file_name,extension);
 }
 
 char *compressLogic(const char *fileText,const long fileSize) {
