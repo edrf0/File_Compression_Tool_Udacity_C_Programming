@@ -6,14 +6,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-void readFile(const char *input_file_name,const char *extension) {
+int readFile(const char *input_file_name,const char *extension) {
     // getting file handle
     FILE *input = fopen(input_file_name, "r");
     // checking if file handle is valid
     if (input == NULL) {
         perror("Failed to open file");
         printf("File path: %s\n",input_file_name);
-        return;
+        return ERROR_FILE_NOT_FOUND;
     }
     // get file size
     fseek(input, 0, SEEK_END);
@@ -24,7 +24,7 @@ void readFile(const char *input_file_name,const char *extension) {
     if (fileSize <= 0) {
         printf("File is empty or invalid.\nFile path: %s\n",input_file_name);
         fclose(input);
-        return;
+        return ERROR_FILE_EMPTY;
     }
 
     // dynamic memory allocation
@@ -33,7 +33,7 @@ void readFile(const char *input_file_name,const char *extension) {
         perror("Failed to allocate memory");
         printf("File path: %s\n",input_file_name);
         fclose(input);
-        return;
+        return ERROR_MEMORY_ALLOCATION;
     }
     // file reading
     const size_t bytesRead = fread(fileText, 1, fileSize, input);
@@ -43,7 +43,7 @@ void readFile(const char *input_file_name,const char *extension) {
     if (bytesRead < (size_t) fileSize) {
         printf( "Error: Could not read entire file.\n");
         free(fileText);
-        return;
+        return ERROR_READ_FAILED;
     }
     // terminating the file buffer with null character
     fileText[bytesRead] = '\0';
@@ -59,7 +59,7 @@ void readFile(const char *input_file_name,const char *extension) {
     // checking if data is null
     if (data == NULL) {
         printf("Error: Processing failed (Logic returned NULL).\n");
-        return;
+        return ERROR_LOGIC_FAILED;
     }
     // finding the extension dot in the input name using string reverse char function
     char baseName[FILENAME_BUFFER_SIZE];
@@ -104,11 +104,14 @@ void readFile(const char *input_file_name,const char *extension) {
         fclose(output);
         // printing to the screen that file was saved
         printf("File saved as: %s\n", versionedName);
-    } else {
-        perror("Error: Could not open output file for writing");
+        // freeing memory
+        free(data);
+        return SUCCESS;
     }
+    perror("Error: Could not open output file for writing");
     // freeing memory
     free(data);
+    return ERROR_FILE_NOT_FOUND;
 }
 
 char *compressLogic(const char *fileText,const long fileSize) {

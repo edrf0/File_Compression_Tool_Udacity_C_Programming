@@ -14,7 +14,5 @@ int decompress(const char *input_file_name)
         return 1;
     }
 
-    readFile(input_file_name,FILE_EXTENSION_DECOMPRESS);
-
-    return 0;
+    return readFile(input_file_name,FILE_EXTENSION_DECOMPRESS);
 }
