@@ -21,6 +21,7 @@ void readFile(const char *input_file_name,const char *extension) {
     // edge case
     if (fileSize == 0) {
         printf("File is empty\n");
+        fclose(input);
         return;
     }
 
@@ -28,6 +29,7 @@ void readFile(const char *input_file_name,const char *extension) {
     char *fileText = malloc(fileSize + 1);
     if (fileText == NULL) {
         perror("Failed to allocate memory");
+        fclose(input);
         return;
     }
     // file reading
@@ -79,8 +81,14 @@ char *compressLogic(const char *fileText,const long fileSize) {
     for (int i=1; i<fileSize; ++i) {
         //checking if the current character is distinct to the one saved
         if (currentChar != fileText[i]) {
-            // concatenating current character and count plus updating tracking index
-            cdIndex += sprintf(compressedData + cdIndex, "%c%d", currentChar, count);
+            // we only concatenate if the current character is not a whitespace
+            if (currentChar != ' ' && currentChar != '\n' && currentChar != '\t') {
+                // concatenating current character and count plus updating tracking index
+                cdIndex += sprintf(compressedData + cdIndex, "%c%d", currentChar, count);
+            } else {
+                // concatenating only the whitespace character without its count
+                cdIndex += sprintf(compressedData + cdIndex, "%c", currentChar);
+            }
             // updating current character
             currentChar = fileText[i];
             // resetting count
@@ -90,6 +98,8 @@ char *compressLogic(const char *fileText,const long fileSize) {
             ++count;
         }
     }
+    // concatenating last character and count
+    cdIndex += sprintf(compressedData + cdIndex, "%c%d", currentChar, count);
     return compressedData;
 }
 
@@ -115,16 +125,20 @@ char *decompressLogic(const char *fileText, const long fileSize) {
         // resetting variables
         count = 0;
         charsRead = 0;
-        // parsing the integer following the character
-        // %d reads the number, %n stores how many digits were skipped
-        if (sscanf(fileText + readIndex, "%d%n", &count, &charsRead) == 1) {
+
+        if (readIndex < fileSize &&
+            sscanf(fileText + readIndex, "%d%n", &count, &charsRead) == 1) {
             readIndex += charsRead;
-            // expanding: writing 'currentChar' 'count' times
+            // expand the character
             for (int i = 0; i < count; ++i) {
-                // potential optimization: check if writeIdx >= outCapacity and realloc
-                decompressedData[writeIndex] = currentChar;
-                ++writeIndex;
+                // safety check to prevent buffer overflow
+                if (writeIndex < outCapacity) {
+                    decompressedData[writeIndex++] = currentChar;
+                }
             }
+        } else {
+            // if no number follows, we treat it as a single occurrence
+            decompressedData[writeIndex++] = currentChar;
         }
     }
     // terminating the data with a null character
