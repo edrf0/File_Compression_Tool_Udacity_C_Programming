@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "constants.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -38,18 +39,23 @@ void readFile(const char *input_file_name,const char *extension) {
 
     // discriminating type of file and respective action
     char *data;
-    if (strcmp(extension, ".txt") == 0) {
+    if (strcmp(extension, FILE_EXTENSION_COMPRESS) == 0) {
         data = compressLogic(fileText,fileSize);
     } else {
         data = decompressLogic(fileText,fileSize);
     }
-
     // closing the file handle
     fclose(input);
     // establishing the filename
-    const char *outFileName = (strcmp(extension, ".txt") == 0) ? "output.rle" : "output.txt";
+    char fileName[FILENAME_BUFFER_SIZE];
+    strcpy(fileName, FILE_OUTPUT_NAME_NO_EXT);
+    if (strcmp(extension, FILE_EXTENSION_COMPRESS) == 0) {
+        strcat(fileName, FILE_EXTENSION_DECOMPRESS);
+    } else {
+        strcat(fileName, FILE_EXTENSION_COMPRESS);
+    }
     // getting a file handle to write
-    FILE *output = fopen(outFileName, "w");
+    FILE *output = fopen(fileName, "w");
     // if file handle is valid
     if (output != NULL) {
         // data is a null-terminated string, so we can use fputs or fwrite
@@ -57,7 +63,7 @@ void readFile(const char *input_file_name,const char *extension) {
         // saving the file
         fclose(output);
         // printing to the screen that file was saved
-        printf("File saved as: %s\n", outFileName);
+        printf("File saved as: %s\n", fileName);
     }
     // freeing memory
     free(fileText);
